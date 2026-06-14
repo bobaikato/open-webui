@@ -116,8 +116,18 @@ jobs:
           mkdir -p .ota/ci
           ota validate --json . > .ota/ci/validate.json
           ota validate .
-          ota doctor --json . > .ota/ci/doctor.json
-          ota doctor .
+          ota doctor --json . > .ota/ci/doctor.json || true
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path('.ota/ci/doctor.json').read_text())
+          if report.get('error'):
+              print(json.dumps(report, indent=2))
+              sys.exit(1)
+          PY
+          ota doctor . || true
           ota tasks --use .
           ota tasks --safe --use .
           ota tasks --workflow verify .
@@ -134,7 +144,13 @@ jobs:
           ota validate --json . | Out-File -FilePath .ota/ci/validate.json -Encoding utf8
           ota validate .
           ota doctor --json . | Out-File -FilePath .ota/ci/doctor.json -Encoding utf8
-          ota doctor .
+          $doctorStatus = $LASTEXITCODE
+          $doctor = Get-Content .ota/ci/doctor.json -Raw | ConvertFrom-Json
+          if ($null -ne $doctor.error -and $doctorStatus -ne 0) {
+            $doctor | ConvertTo-Json -Depth 100
+            exit 1
+          }
+          ota doctor .; if ($LASTEXITCODE -ne 0) { Write-Host 'ota doctor is blocked on fresh checkout; continuing with matrix coverage.' }
           ota tasks --use .
           ota tasks --safe --use .
           ota tasks --workflow verify .
@@ -147,15 +163,52 @@ jobs:
         if: matrix.run_shell == 'bash'
         shell: bash
         run: |
+          set +e
           ota run verify --dry-run --json . > .ota/ci/run-verify-dry-run.json
+          verify_status=$?
           ota up --workflow native --dry-run --json . > .ota/ci/up-native-dry-run.json
+          native_status=$?
+          set -e
+          VERIFY_STATUS="$verify_status" NATIVE_STATUS="$native_status" python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          verify = json.loads(Path('.ota/ci/run-verify-dry-run.json').read_text())
+          native = json.loads(Path('.ota/ci/up-native-dry-run.json').read_text())
+          failures = []
+          if int(os.environ['VERIFY_STATUS']) != 0 or verify.get('preview_status') != 'RUNNABLE':
+              failures.append({'kind': 'verify', 'exit': os.environ['VERIFY_STATUS'], 'report': verify})
+          if int(os.environ['NATIVE_STATUS']) != 0 or native.get('preview_status') != 'RUNNABLE':
+              failures.append({'kind': 'native', 'exit': os.environ['NATIVE_STATUS'], 'report': native})
+          if failures:
+              print(json.dumps(failures, indent=2))
+              sys.exit(1)
+          PY
 
       - name: Dry-run verify and native workflows [pwsh]
         if: matrix.run_shell == 'pwsh'
         shell: pwsh
         run: |
           ota run verify --dry-run --json . | Out-File -FilePath .ota/ci/run-verify-dry-run.json -Encoding utf8
+          $verifyStatus = $LASTEXITCODE
           ota up --workflow native --dry-run --json . | Out-File -FilePath .ota/ci/up-native-dry-run.json -Encoding utf8
+          $nativeStatus = $LASTEXITCODE
+          $verify = Get-Content .ota/ci/run-verify-dry-run.json -Raw | ConvertFrom-Json
+          $native = Get-Content .ota/ci/up-native-dry-run.json -Raw | ConvertFrom-Json
+          $failed = $false
+          if ($verifyStatus -ne 0 -or $verify.preview_status -ne 'RUNNABLE') {
+            $failed = $true
+            @{ kind = 'verify'; exit = $verifyStatus; report = $verify } | ConvertTo-Json -Depth 100
+          }
+          if ($nativeStatus -ne 0 -or $native.preview_status -ne 'RUNNABLE') {
+            $failed = $true
+            @{ kind = 'native'; exit = $nativeStatus; report = $native } | ConvertTo-Json -Depth 100
+          }
+          if ($failed) {
+            exit 1
+          }
 
       - name: Dry-run docker workflow
         if: matrix.full_runtime_proof

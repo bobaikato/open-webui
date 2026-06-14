@@ -219,6 +219,14 @@ tasks:
     requirements:
       toolchains:
         - python
+    effects:
+      writes:
+        - .venv
+        - node_modules
+        - build
+        - backend/open_webui/frontend
+      network: true
+      network_kind: dependency_hydration
     safe_for_agent: true
   verify:frontend:
     context: host
@@ -254,6 +262,11 @@ tasks:
     requirements:
       toolchains:
         - node
+    effects:
+      writes:
+        - node_modules
+      network: true
+      network_kind: dependency_hydration
     safe_for_agent: true
   verify:
     description: Run the highest-signal upstream verification slice from this checkout
@@ -421,6 +434,7 @@ agent:
   writable_paths:
     - .venv
     - backend
+    - backend/open_webui/frontend
     - build
     - docs
     - node_modules
