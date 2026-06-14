@@ -1,0 +1,457 @@
+# <!--
+#                 █████
+#                ░░███
+#        ██████  ███████    ██████
+#       ███░░███░░░███░    ░░░░░███
+#      ░███ ░███  ░███      ███████
+#      ░███ ░███  ░███ ███ ███░░███
+#      ░░██████   ░░█████ ░░████████
+#       ░░░░░░     ░░░░░   ░░░░░░░░
+#
+#    Copyright (C) 2026 — 2026, Ota. All Rights Reserved.
+#
+#    DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+#    Licensed under the Apache License, Version 2.0. See LICENSE for the full license text.
+#    You may not use this file except in compliance with that License.
+#    Unless required by applicable law or agreed to in writing, software distributed under the
+#    License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+#    either express or implied. See the License for the specific language governing permissions
+#    and limitations under the License.
+#
+#    If you need additional information or have any questions, please email: os@ota.run
+# -->
+
+version: 1
+project:
+  name: open-webui
+  description: Open WebUI readiness slice covering upstream CI-style verification, the packaged native CLI runtime path from the source checkout, the frontend Vite development loop, and the default Docker Compose runtime; release publishing and alternate Compose overlays remain out of scope
+  type: application
+metadata:
+  ota:
+    minimum_version: "1.6.20"
+execution:
+  default_context: host
+  contexts:
+    host:
+      backend: native
+toolchains:
+  node:
+    version: ">=18.13.0 <=22.x.x"
+    package_managers:
+      npm: ">=10"
+  python:
+    provider: uv
+    version: ">=3.11,<3.13"
+tools:
+  docker:
+    version: "*"
+    required: false
+  git:
+    version: "*"
+env:
+  sources:
+    - kind: dotenv
+      path: .env
+checks:
+  - name: env-template-present
+    kind: file
+    severity: info
+    path: .env.example
+    expect: file
+  - name: frontend-dependencies-installed
+    kind: file
+    severity: error
+    path: node_modules
+    expect: directory
+  - name: python-environment-installed
+    kind: file
+    severity: error
+    path: .venv/pyvenv.cfg
+    expect: file
+surfaces:
+  native-web:
+    kind: http
+    port: 8080
+    path: /
+    readiness:
+      kind: http
+      method: GET
+      path: /health
+      success:
+        status:
+          - 200
+      body:
+        contains: '"status":true'
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+  frontend:
+    kind: http
+    port: 5173
+    path: /
+    readiness:
+      kind: http
+      method: GET
+      path: /
+      headers:
+        Accept: text/html
+      success:
+        status:
+          - 200
+      body:
+        contains: "<!DOCTYPE html>"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+  docker-web:
+    kind: http
+    port: 3000
+    path: /
+    readiness:
+      kind: http
+      method: GET
+      path: /health
+      success:
+        status:
+          - 200
+      body:
+        contains: '"status":true'
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+services:
+  open-webui:
+    manager:
+      kind: compose
+      name: open-webui
+      file: docker-compose.yaml
+      service: open-webui
+    endpoints:
+      host:
+        address: 127.0.0.1
+        port: 3000
+    readiness:
+      from: host
+      kind: http
+      method: GET
+      path: /health
+      success:
+        status:
+          - 200
+      body:
+        contains: '"status":true'
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+tasks:
+  setup:env:
+    context: host
+    description: Create `.env` from the committed example when it is missing
+    category: setup
+    action:
+      kind: copy_if_missing
+      from: .env.example
+      to: .env
+    safe_for_agent: true
+  setup:frontend:
+    context: host
+    description: Install frontend dependencies with the repo's documented npm force lane
+    notes: |
+      Open WebUI currently documents `npm install --force` for dependency hydration because the
+      frontend dependency graph still has compatibility edges that are not clean under the default
+      npm resolver.
+    category: setup
+    run: npm install --force
+    requirements:
+      toolchains:
+        - node
+    effects:
+      writes:
+        - node_modules
+      network: true
+      network_kind: dependency_hydration
+  setup:backend:
+    context: host
+    description: Hydrate the Python environment through uv from the source checkout
+    notes: |
+      `uv sync` is the truthful Python setup lane for this repo. The package build hook also
+      performs a frontend install/build during package installation, so this setup step still needs
+      Node present even though the repo exposes Python ownership through `pyproject.toml`.
+    category: setup
+    run: uv sync
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - python
+        - node
+    effects:
+      writes:
+        - .venv
+        - node_modules
+        - build
+        - backend/open_webui/frontend
+      network: true
+      network_kind: dependency_hydration
+  setup:
+    description: Prepare the source checkout for verification and native runtime work
+    notes: |
+      This keeps env materialization, frontend hydration, and Python environment setup explicit
+      instead of hiding cross-ecosystem setup inside one opaque shell wrapper.
+    category: setup
+    aggregate:
+      tasks:
+        - setup:env
+        - setup:frontend
+        - setup:backend
+  verify:backend:format:
+    context: host
+    description: Run the upstream backend formatting gate
+    category: test
+    run: uv run ruff format --check . --exclude .venv --exclude venv
+    depends_on:
+      - setup:backend
+    requirements:
+      toolchains:
+        - python
+    safe_for_agent: true
+  verify:frontend:
+    context: host
+    description: Run the upstream frontend format, i18n, and build verification lane
+    notes: |
+      This mirrors the `frontend.yaml` job: run formatting, regenerate i18n artifacts, assert the
+      working tree stays clean, then build production assets.
+    category: test
+    script: |
+      npm run format
+      npm run i18n:parse
+      git diff --exit-code
+      npm run build
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - node
+      tools:
+        git: "*"
+    effects:
+      writes:
+        - src/lib/i18n
+        - build
+        - .svelte-kit
+  test:frontend:
+    context: host
+    description: Run the upstream frontend unit-test lane
+    category: test
+    run: npm run test:frontend
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - node
+    safe_for_agent: true
+  verify:
+    description: Run the highest-signal upstream verification slice from this checkout
+    notes: |
+      This intentionally follows what upstream CI proves today: backend formatting, frontend
+      format/i18n/build verification, and frontend unit tests.
+    category: test
+    aggregate:
+      tasks:
+        - verify:backend:format
+        - verify:frontend
+        - test:frontend
+  serve:native:
+    context: host
+    description: Start Open WebUI through the packaged native CLI path
+    notes: |
+      This follows the supported `open-webui serve` runtime path after source-checkout hydration.
+      It is a packaged native runtime, not the undocumented split source loop of raw backend
+      uvicorn plus a separate frontend terminal.
+    category: dev
+    launch:
+      kind: command
+      exe: uv
+      args:
+        - run
+        - open-webui
+        - serve
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8080"
+    depends_on:
+      - setup:backend
+      - setup:env
+    requirements:
+      toolchains:
+        - python
+        - node
+    runtime:
+      kind: service
+      surfaces:
+        native-web:
+          project:
+            host:
+              primary: true
+  dev:frontend:
+    context: host
+    description: Start the frontend Vite development server
+    category: dev
+    launch:
+      kind: command
+      exe: npm
+      args:
+        - run
+        - dev
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - node
+    runtime:
+      kind: service
+      surfaces:
+        frontend:
+          project:
+            host:
+              primary: true
+  compose:up:
+    context: host
+    description: Start the default Docker Compose runtime
+    notes: |
+      This owns the repo's default packaged runtime path through `docker-compose.yaml`.
+      Alternate overlays such as GPU, API exposure, and Playwright are intentionally left for a
+      later widening pass.
+    category: dev
+    launch:
+      kind: command
+      exe: docker
+      args:
+        - compose
+        - up
+    requirements:
+      tools:
+        docker: "*"
+    effects:
+      external_state:
+        - docker
+    runtime:
+      kind: service
+      surfaces:
+        docker-web:
+          project:
+            host:
+              primary: true
+  compose:down:
+    context: host
+    description: Stop the default Docker Compose runtime
+    category: setup
+    run: docker compose down
+    requirements:
+      tools:
+        docker: "*"
+    effects:
+      external_state:
+        - docker
+workflows:
+  default: verify
+  verify:
+    intent: ci_verification
+    description: Upstream CI-style verification from the source checkout
+    prepare:
+      task: setup:env
+    setup:
+      task: setup
+    run:
+      task: verify
+  native:
+    intent: local_development
+    description: Packaged native CLI runtime from the source checkout
+    prepare:
+      task: setup:env
+    setup:
+      task: setup
+    run:
+      task: serve:native
+    readiness:
+      surfaces:
+        - native-web
+    exposes:
+      - surface: native-web
+  frontend:
+    intent: local_development
+    description: Frontend-only Vite development loop
+    prepare:
+      task: setup:env
+    setup:
+      task: setup:frontend
+    run:
+      task: dev:frontend
+    readiness:
+      surfaces:
+        - frontend
+    exposes:
+      - surface: frontend
+  docker:
+    intent: packaged_runtime
+    description: Default Docker Compose runtime from the repository checkout
+    run:
+      task: compose:up
+    readiness:
+      surfaces:
+        - docker-web
+    exposes:
+      - surface: docker-web
+agent:
+  posture: readiness_strict
+  entrypoint: setup:env
+  default_task: test:frontend
+  safe_tasks:
+    - setup:env
+    - verify:backend:format
+    - test:frontend
+  verify_after_changes:
+    - test:frontend
+  writable_paths:
+    - .venv
+    - backend
+    - build
+    - docs
+    - node_modules
+    - scripts
+    - src
+    - static
+    - test
+  protected_paths:
+    - .env.example
+    - .github/workflows
+    - Dockerfile
+    - docker-compose.api.yaml
+    - docker-compose.gpu.yaml
+    - docker-compose.playwright.yaml
+    - docker-compose.yaml
+    - ota.yaml
+    - package-lock.json
+    - package.json
+    - pyproject.toml
+    - uv.lock
+  bootstrap:
+    ota:
+      note: Install ota only when missing so contributors and agents can run the readiness workflows declared here.
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.20 sh
+      powershell: $env:OTA_VERSION='v1.6.20'; irm https://dist.ota.run/install.ps1 | iex
+  notes: |
+    This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
+    can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
+    the frontend Vite loop, and the default Docker Compose runtime.
+    `verify:frontend` is intentionally outside the default agent-safe path because it mutates
+    format and i18n outputs before asserting the working tree is clean.
+    Alternate Compose overlays such as GPU, API exposure, and Playwright remain out of scope until
+    we decide whether they belong as explicit workflow-owned adapter overlays or as a broader Ota
+    adapter-governance pass.

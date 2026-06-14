@@ -218,6 +218,9 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+.ota/state/
+.ota/receipts/
+.ota/proof/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
