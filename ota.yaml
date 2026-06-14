@@ -37,7 +37,7 @@ execution:
       backend: native
 toolchains:
   node:
-    version: ">=18.13.0 <=22.x.x"
+    version: ">=18.13.0 <23"
     package_managers:
       npm: ">=10"
   python:
