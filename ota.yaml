@@ -203,7 +203,7 @@ tasks:
         - backend/open_webui/frontend
       network: true
       network_kind: dependency_hydration
-    safe_for_agent: true
+    safe_for_agent: false
   verify:frontend:
     context: host
     description: Run the upstream frontend format, i18n, and build verification lane
@@ -243,7 +243,7 @@ tasks:
         - node_modules
       network: true
       network_kind: dependency_hydration
-    safe_for_agent: true
+    safe_for_agent: false
   verify:
     description: Run the highest-signal upstream verification slice from this checkout
     notes: |
@@ -400,13 +400,11 @@ workflows:
 agent:
   posture: readiness_strict
   entrypoint: setup:env
-  default_task: test:frontend
+  default_task: setup:env
   safe_tasks:
     - setup:env
-    - verify:backend:format
-    - test:frontend
   verify_after_changes:
-    - test:frontend
+    - setup:env
   writable_paths:
     - .venv
     - backend
@@ -434,8 +432,8 @@ agent:
   bootstrap:
     ota:
       note: Install ota only when missing so contributors and agents can run the readiness workflows declared here.
-      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.20 sh
-      powershell: $env:OTA_VERSION='v1.6.20'; irm https://dist.ota.run/install.ps1 | iex
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.21 sh
+      powershell: $env:OTA_VERSION='v1.6.21'; irm https://dist.ota.run/install.ps1 | iex
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
