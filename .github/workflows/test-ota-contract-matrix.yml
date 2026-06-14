@@ -92,7 +92,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
-          enable-cache: true
+          enable-cache: false
 
       - name: Install ota (Unix)
         if: runner.os != 'Windows'
