@@ -191,7 +191,18 @@ tasks:
     context: host
     description: Run the upstream backend formatting gate
     category: test
-    run: uv run ruff format --check . --exclude .venv --exclude venv
+    command:
+      exe: uv
+      args:
+        - run
+        - ruff
+        - format
+        - --check
+        - .
+        - --exclude
+        - .venv
+        - --exclude
+        - venv
     depends_on:
       - setup:backend
     requirements:
@@ -234,7 +245,11 @@ tasks:
     context: host
     description: Run the upstream frontend unit-test lane
     category: test
-    run: npm run test:frontend
+    command:
+      exe: npm
+      args:
+        - run
+        - test:frontend
     depends_on:
       - setup:frontend
     requirements:
@@ -343,7 +358,11 @@ tasks:
     context: host
     description: Stop the default Docker Compose runtime
     category: setup
-    run: docker compose down
+    command:
+      exe: docker
+      args:
+        - compose
+        - down
     requirements:
       tools:
         docker: "*"
