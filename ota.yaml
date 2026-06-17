@@ -17,8 +17,10 @@ toolchains:
     package_managers:
       npm: ">=10"
   python:
-    provider: uv
     version: ">=3.11,<3.13"
+    fulfillment:
+      source: uv
+      mode: none
 tools:
   docker:
     version: "*"
