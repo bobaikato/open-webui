@@ -138,11 +138,10 @@ tasks:
     safe_for_agent: true
   setup:frontend:
     context: host
-    description: Install frontend dependencies with the repo's documented npm force lane
+    description: Install frontend dependencies through the repo's npm hydration lane
     notes: |
-      Open WebUI currently documents `npm install --force` for dependency hydration because the
-      frontend dependency graph still has compatibility edges that are not clean under the default
-      npm resolver.
+      A clean Node 22 install succeeds with plain `npm install`, so this setup lane stays on normal
+      npm hydration semantics instead of carrying an exceptional override.
     category: setup
     prepare:
       kind: dependency_hydration
@@ -152,7 +151,6 @@ tasks:
         cwd: .
         manager: npm
         mode: install
-        force: true
     requirements:
       toolchains:
         - node
