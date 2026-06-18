@@ -144,7 +144,15 @@ tasks:
       frontend dependency graph still has compatibility edges that are not clean under the default
       npm resolver.
     category: setup
-    run: npm install --force
+    prepare:
+      kind: dependency_hydration
+      medium: package_dependencies
+      source:
+        kind: node_package_manager
+        cwd: .
+        manager: npm
+        mode: install
+        force: true
     requirements:
       toolchains:
         - node
@@ -161,7 +169,12 @@ tasks:
       performs a frontend install/build during package installation, so this setup step still needs
       Node present even though the repo exposes Python ownership through `pyproject.toml`.
     category: setup
-    run: uv sync
+    prepare:
+      kind: dependency_hydration
+      medium: package_dependencies
+      source:
+        kind: uv
+        cwd: .
     depends_on:
       - setup:frontend
     requirements:
