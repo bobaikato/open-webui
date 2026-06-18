@@ -34,7 +34,7 @@ on:
       ota_ref:
         description: Ota branch, tag, or commit to build for this matrix run
         required: false
-        default: e3f67c3370674eb1eff5e19001ef4f7a7ba6f15d
+        default: 5258c9d3ac74cb6d297ee64033a1e3e8731966e2
   pull_request:
     paths:
       - 'ota.yaml'
@@ -108,10 +108,10 @@ jobs:
         id: contract-ota-pwsh
 
       - name: Install ota from source
-        uses: ota-run/ota/.github/actions/install-ota-from-source@e3f67c3370674eb1eff5e19001ef4f7a7ba6f15d
+        uses: ota-run/ota/.github/actions/install-ota-from-source@5258c9d3ac74cb6d297ee64033a1e3e8731966e2
         with:
           repository: ${{ github.event.inputs.ota_repository || 'ota-run/ota' }}
-          ref: ${{ github.event.inputs.ota_ref || 'e3f67c3370674eb1eff5e19001ef4f7a7ba6f15d' }}
+          ref: ${{ github.event.inputs.ota_ref || '5258c9d3ac74cb6d297ee64033a1e3e8731966e2' }}
 
       - name: Verify ota install [bash]
         if: matrix.run_shell == 'bash'
