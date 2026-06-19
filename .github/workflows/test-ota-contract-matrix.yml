@@ -123,7 +123,7 @@ jobs:
         id: contract-ota-pwsh
 
       - name: Install ota from source
-        uses: ota-run/ota/.github/actions/install-ota-from-source@v1.6.21
+        uses: ota-run/ota/.github/actions/install-ota-from-source@v1.6.20
         with:
           repository: ${{ github.event.inputs.ota_repository || 'bobaikato/ota' }}
           ref: ${{ github.event.inputs.ota_ref || '1.6.21-implementation' }}
