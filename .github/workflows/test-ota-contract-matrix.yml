@@ -97,6 +97,24 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Normalize Python and uv on PATH [bash]
+        if: matrix.run_shell == 'bash'
+        shell: bash
+        run: |
+          python --version
+          uv --version
+          echo "$(dirname "$(command -v python)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v uv)")" >> "$GITHUB_PATH"
+
+      - name: Normalize Python and uv on PATH [pwsh]
+        if: matrix.run_shell == 'pwsh'
+        shell: pwsh
+        run: |
+          python --version
+          uv --version
+          Split-Path (Get-Command python).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command uv).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Resolve contract minimum ota version [bash]
         if: matrix.run_shell == 'bash'
         shell: bash
