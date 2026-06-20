@@ -328,6 +328,25 @@ jobs:
           export PATH="${OTA_NODE_BIN_DIR}:${OTA_NPM_BIN_DIR}:${OTA_UV_BIN_DIR}:${OTA_PYTHON_BIN_DIR}:$PATH"
           ota proof runtime --workflow docker --json . | tee .ota-proof-docker-${{ matrix.name }}.json
 
+      - name: Dump proof failure logs
+        if: ${{ failure() && matrix.full_runtime_proof }}
+        shell: bash
+        run: |
+          if [ -f ./.ota/proof/native/up.log ]; then
+            echo "== ./.ota/proof/native/up.log =="
+            cat ./.ota/proof/native/up.log
+            cp ./.ota/proof/native/up.log ./ota-proof-native-up-${{ matrix.name }}.log
+          fi
+          if [ -f ./.ota/proof/native/doctor.json ]; then
+            echo "== ./.ota/proof/native/doctor.json =="
+            cat ./.ota/proof/native/doctor.json
+            cp ./.ota/proof/native/doctor.json ./ota-proof-native-doctor-${{ matrix.name }}.json
+          fi
+          if [ -d ./.ota/proof/native ]; then
+            echo "== ./.ota/proof/native =="
+            ls -la ./.ota/proof/native
+          fi
+
       - name: Upload failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
@@ -336,5 +355,8 @@ jobs:
           path: |
             .ota-proof-native-${{ matrix.name }}.json
             .ota-proof-docker-${{ matrix.name }}.json
+            ota-proof-native-up-${{ matrix.name }}.log
+            ota-proof-native-doctor-${{ matrix.name }}.json
             .ota/
           retention-days: 7
+          include-hidden-files: true
