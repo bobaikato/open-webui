@@ -103,8 +103,12 @@ jobs:
         run: |
           python --version
           uv --version
+          node --version
+          npm --version
           echo "$(dirname "$(command -v python)")" >> "$GITHUB_PATH"
           echo "$(dirname "$(command -v uv)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v node)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v npm)")" >> "$GITHUB_PATH"
 
       - name: Normalize Python and uv on PATH [pwsh]
         if: matrix.run_shell == 'pwsh'
@@ -112,90 +116,18 @@ jobs:
         run: |
           python --version
           uv --version
+          node --version
+          npm --version
           Split-Path (Get-Command python).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Split-Path (Get-Command uv).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command node).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command npm).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Resolve contract minimum ota version [bash]
-        if: matrix.run_shell == 'bash'
-        shell: bash
-        run: |
-          minimum_version=$(awk -F'"' '/minimum_version:/ {print $2; exit}' ota.yaml)
-          if [ -z "${minimum_version}" ]; then
-            echo "missing metadata.ota.minimum_version in ota.yaml"
-            exit 1
-          fi
-          echo "minimum-version=${minimum_version}" >> "${GITHUB_OUTPUT}"
-        id: contract-ota-bash
-
-      - name: Resolve contract minimum ota version [pwsh]
-        if: matrix.run_shell == 'pwsh'
-        shell: pwsh
-        run: |
-          $line = Select-String -Path ota.yaml -Pattern 'minimum_version:\s*"(.*?)"' | Select-Object -First 1
-          if (-not $line) {
-            Write-Error "missing metadata.ota.minimum_version in ota.yaml"
-            exit 1
-          }
-          $minimumVersion = $line.Matches[0].Groups[1].Value
-          "minimum-version=$minimumVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-        id: contract-ota-pwsh
-
-      - name: Install ota from source
-        uses: ota-run/ota/.github/actions/install-ota-from-source@v1.6.20
+      - name: Set up ota
+        uses: ota-run/setup@v1.0.8
         with:
-          repository: ${{ github.event.inputs.ota_repository || 'bobaikato/ota' }}
-          ref: ${{ github.event.inputs.ota_ref || '1.6.21-implementation' }}
-
-      - name: Verify ota install [bash]
-        if: matrix.run_shell == 'bash'
-        shell: bash
-        run: |
-          ota --version
-          ota --version --json > ota-version.json
-          semver=$(python3 -c 'import json; print(json.load(open("ota-version.json", encoding="utf-8"))["semver"])')
-          minimum="${{ steps.contract-ota-bash.outputs.minimum-version }}"
-          python3 - "$semver" "$minimum" <<'PY'
-          import sys
-          actual = sys.argv[1]
-          minimum = sys.argv[2]
-          def parts(v):
-              return [int(x) for x in v.split("-")[0].split(".")]
-          ap = parts(actual)
-          mp = parts(minimum)
-          while len(ap) < 3:
-              ap.append(0)
-          while len(mp) < 3:
-              mp.append(0)
-          if ap < mp:
-              print(f"expected ota semver >= {minimum}, got {actual}")
-              raise SystemExit(1)
-          PY
-
-      - name: Verify ota install [pwsh]
-        if: matrix.run_shell == 'pwsh'
-        shell: pwsh
-        run: |
-          ota --version
-          & ota --version --json | Out-File -Encoding utf8 ota-version.json
-          $version = (Get-Content ota-version.json -Raw | ConvertFrom-Json).semver
-          $minimum = "${{ steps.contract-ota-pwsh.outputs.minimum-version }}"
-          $parse = {
-            param([string]$v)
-            ($v.Split('-')[0].Split('.') | ForEach-Object { [int]$_ })
-          }
-          $actualParts = & $parse $version
-          $minimumParts = & $parse $minimum
-          while ($actualParts.Count -lt 3) { $actualParts += 0 }
-          while ($minimumParts.Count -lt 3) { $minimumParts += 0 }
-          $below = $false
-          for ($i = 0; $i -lt 3; $i++) {
-            if ($actualParts[$i] -lt $minimumParts[$i]) { $below = $true; break }
-            if ($actualParts[$i] -gt $minimumParts[$i]) { break }
-          }
-          if ($below) {
-            Write-Error "expected ota semver >= $minimum, got $version"
-            exit 1
-          }
+          source: contract
+          contract-path: ota.yaml
 
       - name: Contract gates [bash]
         if: matrix.run_shell == 'bash'
