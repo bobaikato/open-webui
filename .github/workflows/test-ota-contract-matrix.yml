@@ -129,6 +129,32 @@ jobs:
           source: contract
           contract-path: ota.yaml
 
+      - name: Reassert runtime tool paths [bash]
+        if: matrix.run_shell == 'bash'
+        shell: bash
+        run: |
+          python --version
+          uv --version
+          node --version
+          npm --version
+          echo "$(dirname "$(command -v python)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v uv)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v node)")" >> "$GITHUB_PATH"
+          echo "$(dirname "$(command -v npm)")" >> "$GITHUB_PATH"
+
+      - name: Reassert runtime tool paths [pwsh]
+        if: matrix.run_shell == 'pwsh'
+        shell: pwsh
+        run: |
+          python --version
+          uv --version
+          node --version
+          npm --version
+          Split-Path (Get-Command python).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command uv).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command node).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Split-Path (Get-Command npm).Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Contract gates [bash]
         if: matrix.run_shell == 'bash'
         shell: bash
@@ -262,13 +288,13 @@ jobs:
         if: matrix.full_runtime_proof
         shell: bash
         run: |
-          ota proof runtime --workflow native --json . > .ota-proof-native-${{ matrix.name }}.json
+          ota proof runtime --workflow native --json . | tee .ota-proof-native-${{ matrix.name }}.json
 
       - name: Proof Docker Compose workflow
         if: matrix.full_runtime_proof
         shell: bash
         run: |
-          ota proof runtime --workflow docker --json . > .ota-proof-docker-${{ matrix.name }}.json
+          ota proof runtime --workflow docker --json . | tee .ota-proof-docker-${{ matrix.name }}.json
 
       - name: Upload failure artifacts
         if: ${{ failure() }}
