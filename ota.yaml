@@ -464,8 +464,9 @@ agent:
   bootstrap:
     ota:
       note: Install ota only when missing so contributors and agents can run the readiness workflows declared here.
-      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.21 sh
-      powershell: $env:OTA_VERSION='v1.6.21'; irm https://dist.ota.run/install.ps1 | iex
+      source:
+        kind: branch
+        branch: 1.6.21-implementation
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
