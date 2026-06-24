@@ -465,8 +465,8 @@ agent:
     ota:
       note: Install ota only when missing so contributors and agents can run the readiness workflows declared here.
       source:
-        kind: branch
-        branch: 1.6.22-implementation
+        kind: git_rev
+        rev: f78c7f1cd4fdae0c92be06d9834e2b3c9957beee
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
