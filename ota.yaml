@@ -1,7 +1,7 @@
 version: 1
 project:
   name: open-webui
-  description: Open WebUI readiness slice covering upstream CI-style verification, the packaged native CLI runtime path from the source checkout, the frontend Vite development loop, and the default Docker Compose runtime; release publishing and alternate Compose overlays remain out of scope
+  description: Open WebUI readiness slice covering upstream CI-style verification, the packaged native CLI runtime path from the source checkout, the frontend Vite development loop, the default Docker Compose runtime, and the documented Playwright-enabled Compose overlay
   type: application
 metadata:
   ota:
@@ -126,6 +126,14 @@ services:
       timeout: 3s
       retries: 30
       start_period: 15s
+  playwright:
+    manager:
+      kind: compose
+      name: open-webui
+      files:
+        - docker-compose.yaml
+        - docker-compose.playwright.yaml
+      service: playwright
 tasks:
   setup:env:
     context: host
@@ -343,15 +351,44 @@ tasks:
     description: Start the default Docker Compose runtime
     notes: |
       This owns the repo's default packaged runtime path through `docker-compose.yaml`.
-      Alternate overlays such as GPU, API exposure, and Playwright are intentionally left for a
-      later widening pass.
+      Alternate overlays such as GPU and API exposure remain intentionally out of scope here.
     category: dev
     launch:
-      kind: command
-      exe: docker
-      args:
-        - compose
-        - up
+      kind: compose
+      engine: docker
+      action: up
+      detach: true
+    requirements:
+      tools:
+        docker: "*"
+    effects:
+      external_state:
+        - docker
+    runtime:
+      kind: service
+      surfaces:
+        docker-web:
+          project:
+            host:
+              primary: true
+  compose:up:playwright:
+    context: host
+    description: Start the Playwright-enabled Docker Compose runtime
+    notes: |
+      This owns the documented Compose overlay path that enables the Playwright-backed web loader
+      through `docker-compose.playwright.yaml`.
+    category: dev
+    adapter_inputs:
+      overlays:
+        compose:
+          files:
+            - docker-compose.yaml
+            - docker-compose.playwright.yaml
+    launch:
+      kind: compose
+      engine: docker
+      action: up
+      detach: true
     requirements:
       tools:
         docker: "*"
@@ -374,6 +411,27 @@ tasks:
       args:
         - compose
         - down
+    requirements:
+      tools:
+        docker: "*"
+    effects:
+      external_state:
+        - docker
+  compose:down:playwright:
+    context: host
+    description: Stop the Playwright-enabled Docker Compose runtime
+    notes: |
+      This owns shutdown of the documented Playwright overlay path through the same Compose file
+      stack used for startup, so the sidecar service is not left outside contract ownership.
+    category: setup
+    adapter_inputs:
+      overlays:
+        compose:
+          files:
+            - docker-compose.yaml
+            - docker-compose.playwright.yaml
+    compose:
+      kind: down
     requirements:
       tools:
         docker: "*"
@@ -429,6 +487,19 @@ workflows:
         - docker-web
     exposes:
       - surface: docker-web
+  docker:playwright:
+    intent: packaged_runtime
+    description: Docker Compose runtime with the documented Playwright web-loader overlay
+    run:
+      task: compose:up:playwright
+    services:
+      required:
+        - playwright
+    readiness:
+      surfaces:
+        - docker-web
+    exposes:
+      - surface: docker-web
 agent:
   posture: readiness_strict
   entrypoint: setup:env
@@ -470,9 +541,10 @@ agent:
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
-    the frontend Vite loop, and the default Docker Compose runtime.
+    the frontend Vite loop, the default Docker Compose runtime, and the documented Playwright
+    Compose overlay.
     `verify:frontend` is intentionally outside the default agent-safe path because it mutates
     format and i18n outputs before asserting the working tree is clean.
-    Alternate Compose overlays such as GPU, API exposure, and Playwright remain out of scope until
-    we decide whether they belong as explicit workflow-owned adapter overlays or as a broader Ota
+    Alternate Compose overlays such as GPU and API exposure remain out of scope until we decide
+    whether they belong as explicit workflow-owned adapter overlays or as a broader Ota
     adapter-governance pass.
