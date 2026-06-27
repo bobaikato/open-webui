@@ -406,11 +406,9 @@ tasks:
     context: host
     description: Stop the default Docker Compose runtime
     category: setup
-    command:
-      exe: docker
-      args:
-        - compose
-        - down
+    compose:
+      kind: down
+      engine: docker
     requirements:
       tools:
         docker: "*"
@@ -535,9 +533,8 @@ agent:
   bootstrap:
     ota:
       note: Install ota only when missing so contributors and agents can run the readiness workflows declared here.
-      source:
-        kind: git_rev
-        rev: f78c7f1cd4fdae0c92be06d9834e2b3c9957beee
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_GIT_BRANCH=1.6.22-implementation sh -s -- --from-git
+      powershell: $env:OTA_GIT_BRANCH='1.6.22-implementation'; & ([scriptblock]::Create((irm https://dist.ota.run/install.ps1))) -FromGit
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
