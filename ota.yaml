@@ -5,7 +5,7 @@ project:
   type: application
 metadata:
   ota:
-    minimum_version: "1.6.21"
+    minimum_version: "1.6.22"
 execution:
   default_context: host
   contexts:
