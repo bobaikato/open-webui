@@ -237,17 +237,41 @@ tasks:
       network_kind: dependency_hydration
     safe_for_agent: false
   verify:frontend:
-    context: host
-    description: Run the upstream frontend format, i18n, and build verification lane
+    description: Run the upstream frontend verification aggregate
     notes: |
-      This mirrors the `frontend.yaml` job: run formatting, regenerate i18n artifacts, assert the
-      working tree stays clean, then build production assets.
+      This stays aligned to the repo's frontend CI lane as separate formatter, i18n, and build
+      tasks instead of hiding that verification truth inside one opaque shell body.
+    category: test
+    aggregate:
+      tasks:
+        - format
+        - verify:i18n-strings
+        - build
+  format:
+    context: host
+    description: Run the upstream frontend formatting verification gate
+    category: test
+    command:
+      exe: npm
+      args:
+        - run
+        - format
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - node
+    effects:
+      writes:
+        - build
+        - .svelte-kit
+  verify:i18n-strings:
+    context: host
+    description: Regenerate i18n artifacts and assert the working tree stays clean
     category: test
     script: |
-      npm run format
       npm run i18n:parse
       git diff --exit-code
-      npm run build
     depends_on:
       - setup:frontend
     requirements:
@@ -258,6 +282,22 @@ tasks:
     effects:
       writes:
         - src/lib/i18n
+  build:
+    context: host
+    description: Run the upstream frontend production build verification gate
+    category: test
+    command:
+      exe: npm
+      args:
+        - run
+        - build
+    depends_on:
+      - setup:frontend
+    requirements:
+      toolchains:
+        - node
+    effects:
+      writes:
         - build
         - .svelte-kit
   test:frontend:
@@ -281,15 +321,17 @@ tasks:
       network_kind: dependency_hydration
     safe_for_agent: false
   verify:
-    description: Run the highest-signal upstream verification slice from this checkout
+    description: Run the highest-signal upstream frontend verification slice from this checkout
     notes: |
-      This intentionally follows what upstream CI proves today: backend formatting, frontend
-      format/i18n/build verification, and frontend unit tests.
+      Upstream CI splits backend formatting and frontend verification into separate workflow files.
+      This workflow intentionally owns the frontend CI lane directly, while backend formatting
+      remains exposed as `verify:backend:format`.
     category: test
     aggregate:
       tasks:
-        - verify:backend:format
-        - verify:frontend
+        - format
+        - verify:i18n-strings
+        - build
         - test:frontend
   serve:native:
     context: host
@@ -440,13 +482,22 @@ workflows:
   default: verify
   verify:
     intent: ci_verification
-    description: Upstream CI-style verification from the source checkout
+    description: Upstream frontend CI-style verification from the source checkout
     prepare:
       task: setup:env
     setup:
       task: setup
     run:
       task: verify
+  verify:backend:
+    intent: ci_verification
+    description: Upstream backend Ruff formatting verification from the source checkout
+    prepare:
+      task: setup:env
+    setup:
+      task: setup:backend
+    run:
+      task: verify:backend:format
   native:
     intent: local_development
     description: Packaged native CLI runtime from the source checkout
