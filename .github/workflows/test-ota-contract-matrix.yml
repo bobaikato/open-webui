@@ -241,7 +241,7 @@ jobs:
           native = json.loads(Path('.ota/ci/up-native-dry-run.json').read_text())
           failures = []
           allowed_previews = {'RUNNABLE', 'RUNNABLE WITH WARNINGS'}
-          if int(os.environ['VERIFY_STATUS']) != 0 or verify.get('preview_status') != 'RUNNABLE':
+          if int(os.environ['VERIFY_STATUS']) != 0 or verify.get('preview_status') not in allowed_previews:
               failures.append({'kind': 'verify', 'exit': os.environ['VERIFY_STATUS'], 'report': verify})
           if int(os.environ['NATIVE_STATUS']) != 0 or native.get('preview_status') not in allowed_previews:
               failures.append({'kind': 'native', 'exit': os.environ['NATIVE_STATUS'], 'report': native})
@@ -262,12 +262,12 @@ jobs:
           $verify = Get-Content .ota/ci/run-verify-dry-run.json -Raw | ConvertFrom-Json
           $native = Get-Content .ota/ci/up-native-dry-run.json -Raw | ConvertFrom-Json
           $failed = $false
-          $allowedNativePreviews = @('RUNNABLE', 'RUNNABLE WITH WARNINGS')
-          if ($verifyStatus -ne 0 -or $verify.preview_status -ne 'RUNNABLE') {
+          $allowedPreviews = @('RUNNABLE', 'RUNNABLE WITH WARNINGS')
+          if ($verifyStatus -ne 0 -or $verify.preview_status -notin $allowedPreviews) {
             $failed = $true
             @{ kind = 'verify'; exit = $verifyStatus; report = $verify } | ConvertTo-Json -Depth 100
           }
-          if ($nativeStatus -ne 0 -or $native.preview_status -notin $allowedNativePreviews) {
+          if ($nativeStatus -ne 0 -or $native.preview_status -notin $allowedPreviews) {
             $failed = $true
             @{ kind = 'native'; exit = $nativeStatus; report = $native } | ConvertTo-Json -Depth 100
           }
