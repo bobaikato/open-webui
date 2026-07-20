@@ -26,15 +26,6 @@ name: 'Test: Ota contract matrix'
 
 on:
   workflow_dispatch:
-    inputs:
-      ota_repository:
-        description: Ota source repository to build for this matrix run
-        required: false
-        default: bobaikato/ota
-      ota_ref:
-        description: Ota branch, tag, or commit to build for this matrix run
-        required: false
-        default: 1.6.21-implementation
   pull_request:
     paths:
       - 'ota.yaml'
@@ -291,7 +282,7 @@ jobs:
           export PATH="${OTA_NODE_BIN_DIR}:${OTA_NPM_BIN_DIR}:${OTA_UV_BIN_DIR}:${OTA_PYTHON_BIN_DIR}:$PATH"
           ota up --workflow docker --dry-run --json . > .ota/ci/up-docker-dry-run.json
 
-      - name: Execute finite verification tasks [bash]
+      - name: Dry-run finite verification tasks [bash]
         if: matrix.run_shell == 'bash'
         shell: bash
         run: |
@@ -299,7 +290,7 @@ jobs:
           ota run verify:backend:format --dry-run --json . > .ota/ci/run-verify-backend-format.json
           ota run test:frontend --dry-run --json . > .ota/ci/run-test-frontend.json
 
-      - name: Execute finite verification tasks [pwsh]
+      - name: Dry-run finite verification tasks [pwsh]
         if: matrix.run_shell == 'pwsh'
         shell: pwsh
         run: |
@@ -307,12 +298,28 @@ jobs:
           ota run verify:backend:format --dry-run --json . | Out-File -FilePath .ota/ci/run-verify-backend-format.json -Encoding utf8
           ota run test:frontend --dry-run --json . | Out-File -FilePath .ota/ci/run-test-frontend.json -Encoding utf8
 
+      - name: Execute finite verification tasks [bash]
+        if: matrix.run_shell == 'bash'
+        shell: bash
+        run: |
+          export PATH="${OTA_NODE_BIN_DIR}:${OTA_NPM_BIN_DIR}:${OTA_UV_BIN_DIR}:${OTA_PYTHON_BIN_DIR}:$PATH"
+          ota run verify:backend:format --json . > .ota/ci/run-verify-backend-format-execution.json
+          ota run test:frontend --json . > .ota/ci/run-test-frontend-execution.json
+
+      - name: Execute finite verification tasks [pwsh]
+        if: matrix.run_shell == 'pwsh'
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:OTA_NODE_BIN_DIR;$env:OTA_NPM_BIN_DIR;$env:OTA_UV_BIN_DIR;$env:OTA_PYTHON_BIN_DIR;$env:PATH"
+          ota run verify:backend:format --json . | Out-File -FilePath .ota/ci/run-verify-backend-format-execution.json -Encoding utf8
+          ota run test:frontend --json . | Out-File -FilePath .ota/ci/run-test-frontend-execution.json -Encoding utf8
+
       - name: Execute full frontend verify lane
         if: matrix.full_runtime_proof
         shell: bash
         run: |
           export PATH="${OTA_NODE_BIN_DIR}:${OTA_NPM_BIN_DIR}:${OTA_UV_BIN_DIR}:${OTA_PYTHON_BIN_DIR}:$PATH"
-          ota run verify:frontend --dry-run --json . > .ota/ci/run-verify-frontend.json
+          ota run verify:frontend --json . > .ota/ci/run-verify-frontend-execution.json
 
       - name: Proof packaged native workflow
         if: matrix.full_runtime_proof
