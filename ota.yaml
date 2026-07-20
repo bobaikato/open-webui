@@ -208,12 +208,13 @@ tasks:
         - setup:backend
   verify:backend:format:
     context: host
-    description: Run the upstream backend formatting gate
+    description: Run the upstream backend formatting gate without materializing the application environment
     category: test
     command:
-      exe: uv
+      exe: uvx
       args:
-        - run
+        - --from
+        - ruff>=0.15.5
         - ruff
         - format
         - --check
@@ -222,19 +223,12 @@ tasks:
         - .venv
         - --exclude
         - venv
-    depends_on:
-      - setup:backend
     requirements:
       toolchains:
         - python
     effects:
-      writes:
-        - .venv
-        - node_modules
-        - build
-        - backend/open_webui/frontend
       network: true
-      network_kind: dependency_hydration
+      network_kind: tool_bootstrap
     safe_for_agent: false
   verify:frontend:
     description: Run the upstream frontend verification aggregate
