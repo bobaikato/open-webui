@@ -126,6 +126,8 @@ services:
       timeout: 3s
       retries: 30
       start_period: 15s
+    lifecycle:
+      teardown_assertion: manager_inactive
   playwright:
     manager:
       kind: compose
@@ -472,6 +474,52 @@ tasks:
     effects:
       external_state:
         - docker
+
+  docker:health:assertion:
+    context: host
+    description: Confirm the default managed Docker runtime answers its declared health endpoint
+    category: test
+    command:
+      exe: curl
+      args:
+        - --fail
+        - --silent
+        - --show-error
+        - --max-time
+        - "10"
+        - http://127.0.0.1:3000/health
+    requires_services:
+      - open-webui
+    requirements:
+      tools:
+        curl: "*"
+    effects:
+      network: true
+      network_kind: integration_test
+
+  docker:health:unreachable-control:
+    context: host
+    description: >-
+      Intentionally assert an unreachable endpoint after the managed Docker runtime is ready to
+      pressure lifecycle failure diagnostics and cleanup; this is not a product verification lane.
+    category: test
+    command:
+      exe: curl
+      args:
+        - --fail
+        - --silent
+        - --show-error
+        - --max-time
+        - "10"
+        - http://127.0.0.1:9/health
+    requires_services:
+      - open-webui
+    requirements:
+      tools:
+        curl: "*"
+    effects:
+      network: true
+      network_kind: integration_test
 workflows:
   default: verify
   verify:
@@ -543,6 +591,30 @@ workflows:
         - docker-web
     exposes:
       - surface: docker-web
+  docker:lifecycle:
+    intent: verification
+    description: Prove Ota-managed default Docker runtime startup, health assertion, and teardown
+    run:
+      task: setup:env
+    proof:
+      lifecycle:
+        services:
+          - open-webui
+        assertion:
+          task: docker:health:assertion
+  docker:lifecycle:failure-control:
+    intent: verification
+    description: >-
+      Intentionally fail an unreachable health assertion after managed startup to prove Ota retains
+      diagnostics and tears the Docker runtime down.
+    run:
+      task: setup:env
+    proof:
+      lifecycle:
+        services:
+          - open-webui
+        assertion:
+          task: docker:health:unreachable-control
 agent:
   posture: readiness_strict
   entrypoint: setup:env
@@ -578,8 +650,8 @@ agent:
   bootstrap:
     ota:
       source:
-        kind: version
-        version: v1.6.24
+        kind: git_rev
+        rev: 445cd45ccf77c08abd46c886e9f0a8028c0d75d6
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,

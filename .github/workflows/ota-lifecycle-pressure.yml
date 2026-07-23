@@ -1,0 +1,80 @@
+# <!--
+#                 █████
+#                ░░███
+#        ██████  ███████    ██████
+#       ███░░███░░░███░    ░░░░░███
+#      ░███ ░███  ░███      ███████
+#      ░███ ░███  ░███ ███ ███░░███
+#      ░░██████   ░░█████ ░░████████
+#       ░░░░░░     ░░░░░   ░░░░░░░░
+#
+#    Copyright (C) 2026 — 2026, Ota. All Rights Reserved.
+#
+#    DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    Unless required by applicable law or agreed to in writing, software distributed under the
+#    License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+#    either express or implied. See the License for the specific language governing permissions
+#    and limitations under the License.
+# -->
+
+name: Ota lifecycle pressure
+
+on:
+  push:
+    branches:
+      - bobai/open-webui-ota-pressure
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-proof:
+    name: Managed Docker lifecycle proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ota-run/setup@493cba84bf7f7c11c9e8e996d832d93a89c62184
+        with:
+          source: contract
+      - name: Validate lifecycle contract
+        run: ota validate . --json
+      - name: Diagnose lifecycle lane
+        run: ota doctor --workflow docker:lifecycle --json . > ota-lifecycle-doctor.json
+      - name: Prove managed Docker lifecycle transaction
+        run: ota proof lifecycle --workflow docker:lifecycle --archive --json . > ota-lifecycle-proof.json
+      - name: Prove lifecycle assertion-failure finalization
+        shell: bash
+        run: |
+          set +e
+          ota proof lifecycle --workflow docker:lifecycle:failure-control --archive --json . > ota-lifecycle-failure-control.json
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "expected lifecycle failure control to fail"
+            exit 1
+          fi
+          jq -e '
+            (.archive.identity | startswith("sha256:")) and
+            .proof.ok == false and
+            .proof.proof_verdict == "failed" and
+            .proof.assertion.task == "docker:health:unreachable-control" and
+            .proof.assertion.state == "failed" and
+            (.proof.assertion.exit_code | type) == "number" and
+            .proof.finalization.state == "completed" and
+            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | length > 0) and
+            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | all(. == "state_observed"))
+          ' ota-lifecycle-failure-control.json
+      - name: Upload lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ota-lifecycle-pressure
+          path: |
+            ota-lifecycle-doctor.json
+            ota-lifecycle-proof.json
+            ota-lifecycle-failure-control.json
