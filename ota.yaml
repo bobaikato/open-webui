@@ -495,7 +495,7 @@ tasks:
         curl: "*"
     effects:
       network: true
-      network_kind: integration_test
+      network_kind: service_readiness
 
   docker:health:unreachable-control:
     context: host
@@ -519,7 +519,7 @@ tasks:
         curl: "*"
     effects:
       network: true
-      network_kind: integration_test
+      network_kind: service_readiness
 workflows:
   default: verify
   verify:
@@ -651,7 +651,7 @@ agent:
     ota:
       source:
         kind: git_rev
-        rev: 445cd45ccf77c08abd46c886e9f0a8028c0d75d6
+        rev: 5ac1388784e04e5092aa6a43e37d2ebca619e6ce
   notes: |
     This contract intentionally scopes Open WebUI to the highest-signal source-checkout slices we
     can govern truthfully today: upstream CI-style verification, the packaged native CLI runtime,
