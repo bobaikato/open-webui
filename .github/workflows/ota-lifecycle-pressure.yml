@@ -60,14 +60,14 @@ jobs:
           fi
           jq -e '
             (.archive.identity | startswith("sha256:")) and
-            .proof.ok == false and
-            .proof.proof_verdict == "failed" and
-            .proof.assertion.task == "docker:health:unreachable-control" and
-            .proof.assertion.state == "failed" and
-            (.proof.assertion.exit_code | type) == "number" and
-            .proof.finalization.state == "completed" and
-            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | length > 0) and
-            ([.proof.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | all(. == "state_observed"))
+            .ok == false and
+            .proof_verdict == "failed" and
+            .assertion.task == "docker:health:unreachable-control" and
+            .assertion.state == "failed" and
+            (.assertion.exit_code | type) == "number" and
+            .finalization.state == "completed" and
+            ([.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | length > 0) and
+            ([.services[] | select(.ownership == "started_this_transaction") | .teardown_assertion.state] | all(. == "state_observed"))
           ' ota-lifecycle-failure-control.json
       - name: Upload lifecycle evidence
         if: always()
