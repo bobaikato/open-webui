@@ -355,9 +355,23 @@ jobs:
             cat ./.ota/proof/native/doctor.json
             cp ./.ota/proof/native/doctor.json ./ota-proof-native-doctor-${{ matrix.name }}.json
           fi
+          if [ -f ./.ota/proof/docker/up.log ]; then
+            echo "== ./.ota/proof/docker/up.log =="
+            cat ./.ota/proof/docker/up.log
+            cp ./.ota/proof/docker/up.log ./ota-proof-docker-up-${{ matrix.name }}.log
+          fi
+          if [ -f ./.ota/proof/docker/doctor.json ]; then
+            echo "== ./.ota/proof/docker/doctor.json =="
+            cat ./.ota/proof/docker/doctor.json
+            cp ./.ota/proof/docker/doctor.json ./ota-proof-docker-doctor-${{ matrix.name }}.json
+          fi
           if [ -d ./.ota/proof/native ]; then
             echo "== ./.ota/proof/native =="
             ls -la ./.ota/proof/native
+          fi
+          if [ -d ./.ota/proof/docker ]; then
+            echo "== ./.ota/proof/docker =="
+            ls -la ./.ota/proof/docker
           fi
 
       - name: Upload failure artifacts
@@ -370,6 +384,8 @@ jobs:
             .ota-proof-docker-${{ matrix.name }}.json
             ota-proof-native-up-${{ matrix.name }}.log
             ota-proof-native-doctor-${{ matrix.name }}.json
+            ota-proof-docker-up-${{ matrix.name }}.log
+            ota-proof-docker-doctor-${{ matrix.name }}.json
             .ota/
           retention-days: 7
           include-hidden-files: true
